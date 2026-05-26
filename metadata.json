@@ -1,0 +1,6 @@
+{
+  "name": "StudyBud",
+  "description": "Plataforma de Estudos Universitária com IA para estudantes de Engenharia Informática.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
