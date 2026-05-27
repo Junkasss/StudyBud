@@ -7,7 +7,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { TestQuestions, AICorrectionResult, TestAnswers } from '../types';
 
 // Hardcoded API Key as requested in Alteration 1
-const GEMINI_API_KEY = "AIzaSyDlRly44lILQn2aRT1BQaO5fcwnjLZGxho";
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "AIzaSyDlRly44lILQn2aRT1BQaO5fcwnjLZGxho";
 
 // Model name as specified
 const MODEL_NAME = 'gemini-2.0-flash';
