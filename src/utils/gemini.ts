@@ -10,7 +10,7 @@ import { TestQuestions, AICorrectionResult, TestAnswers } from '../types';
 const GEMINI_API_KEY = "AIzaSyDlRly44lILQn2aRT1BQaO5fcwnjLZGxho";
 
 // Model name as specified
-const MODEL_NAME = 'gemini-1.5-flash';
+const MODEL_NAME = 'gemini-2.0-flash';
 
 // Global instances
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
@@ -22,20 +22,6 @@ function getPureBase64(base64: string): string {
     return base64.split(',')[1];
   }
   return base64;
-}
-
-// Simple JSON extraction helper to clean any text wraps (such as markdown ```json ... ```)
-function extractJson(responseStr: string): string {
-  let cleaned = responseStr.trim();
-  if (cleaned.startsWith('```json')) {
-    cleaned = cleaned.substring(7);
-  } else if (cleaned.startsWith('```')) {
-    cleaned = cleaned.substring(3);
-  }
-  if (cleaned.endsWith('```')) {
-    cleaned = cleaned.substring(0, cleaned.length - 3);
-  }
-  return cleaned.trim();
 }
 
 /**
@@ -52,67 +38,41 @@ export async function generateSummary(
 
   if (onLoadingStatus) onLoadingStatus('A IA está a ler o teu PDF...');
 
-  const pdfPart = {
-    inlineData: {
-      mimeType: 'application/pdf',
-      data: pureBase64,
-    },
-  };
+  const prompt = `Analisa este PDF de slides universitários da disciplina de ${disciplina}.
+Gera um resumo de estudo EXTREMAMENTE COMPLETO em português de Portugal (pt-PT).
+${professorTips ? `Atenção especial aos seguintes tópicos: ${professorTips}` : ''}
 
-  const tipsPrompt = professorTips?.trim()
-    ? `\n\nAtenção especial aos seguintes tópicos indicados pelo professor: ${professorTips}`
-    : '';
-
-  const mainPrompt = `Analisa este PDF de slides universitários da disciplina de [${disciplina}].
-Gera um resumo de estudo EXTREMAMENTE COMPLETO e DETALHADO em português de Portugal (pt-PT).${tipsPrompt}
-
-O resumo DEVE ter obrigatoriamente esta estrutura em Markdown:
-
-# Resumo de Estudo — [${disciplina}]
-
+Estrutura obrigatória em Markdown:
+# Resumo de Estudo — ${disciplina}
 ## 1. Resumo Executivo
-[2-3 parágrafos com os conceitos centrais do documento]
-
 ## 2. Índice de Tópicos
-[lista numerada de todos os tópicos abordados no PDF]
-
 ## 3. Conteúdo Detalhado por Tópico
-[Para CADA tópico do PDF:
-### 3.X Nome do Tópico
-- Explicação detalhada
-- Exemplos concretos
-- Fórmulas ou código se aplicável
-- Comparações com outros conceitos se relevante]
-
 ## 4. Tabelas Comparativas
-[Tabelas Markdown para comparar conceitos semelhantes encontrados no PDF]
-
 ## 5. Pontos-Chave para Exame
-[lista bullet com os 10-15 pontos mais importantes e prováveis de sair em exame]
-
 ## 6. Glossário
-[Termo: Definição, para todos os termos técnicos do PDF]
-
 ## 7. Perguntas de Auto-Avaliação
-[5 perguntas rápidas com resposta para o estudante se testar]
 
-IMPORTANTE: Baseia-te EXCLUSIVAMENTE no conteúdo do PDF fornecido. Não inventes conteúdo que não esteja nos slides.`;
+Baseia-te EXCLUSIVAMENTE no conteúdo do PDF.`;
 
-  if (onLoadingStatus) onLoadingStatus('A identificar conceitos-chave...');
+  console.log('generateSummary: enviando chamada para a API do Gemini...', { disciplina });
   
   try {
-    if (onLoadingStatus) onLoadingStatus('A estruturar o resumo...');
     const result = await model.generateContent([
-      pdfPart,
-      { text: mainPrompt }
+      {
+        inlineData: {
+          mimeType: "application/pdf",
+          data: pureBase64
+        }
+      },
+      { text: prompt }
     ]);
-    
-    if (onLoadingStatus) onLoadingStatus('A finalizar...');
+
+    console.log('generateSummary: resposta da chamada recebida do Gemini.');
     const response = await result.response;
     return response.text() || '';
   } catch (error: any) {
-    console.error('generateSummary error:', error);
-    throw error;
+    console.error("Erro Gemini generateSummary:", error);
+    throw new Error(`Erro ao gerar resumo: ${error.message || error}`);
   }
 }
 
@@ -134,100 +94,75 @@ export async function generateQuestions(
 
   if (onLoadingStatus) onLoadingStatus('A analisar os slides do PDF...');
 
-  const pdfPart = {
-    inlineData: {
-      mimeType: 'application/pdf',
-      data: pureBase64,
-    },
-  };
+  const prompt = `Analisa este PDF da disciplina ${disciplina} e gera um teste académico${nomeTeste ? ` intitulado "${nomeTeste}"` : ''}.
+${professorTips ? `Estilo de perguntas do professor: ${professorTips}` : ''}
 
-  const tipsPrompt = professorTips?.trim()
-    ? `\n\nSiga o estilo de perguntas indicado: ${professorTips}`
-    : '';
+Gera EXATAMENTE:
+- ${numMultipla} perguntas de escolha múltipla
+- ${numDesenvolvimento} perguntas de desenvolvimento
+- ${numCodigo} perguntas de código
 
-  const mainPrompt = `Analisa este PDF de slides da disciplina [${disciplina}] e gera um teste de avaliação académico intitulado "${nomeTeste || 'Teste'}" em português de Portugal.
-${tipsPrompt}
+REGRAS:
+1. Todas as perguntas baseadas EXCLUSIVAMENTE no PDF
+2. Sem perguntas repetidas ou semelhantes
+3. Varia dificuldade entre fácil, médio e difícil
 
-Gera EXACTAMENTE:
-- ${numMultipla} perguntas de escolha múltipla (Parte I)
-- ${numDesenvolvimento} perguntas de desenvolvimento (Parte II)
-- ${numCodigo} perguntas de código/programação (Parte III)
-
-REGRAS OBRIGATÓRIAS:
-1. TODAS as perguntas devem basear-se EXCLUSIVAMENTE no conteúdo do PDF fornecido.
-2. NÃO repitas perguntas semelhantes — cada pergunta deve ser única e sobre um tópico diferente.
-3. Varia o nível de dificuldade (fácil, médio, difícil).
-4. As perguntas de código devem especificar a linguagem (Java, Python, C, C++, Javascript, etc.) conforme os slides.
-
-Devolve um JSON válido com esta estrutura exata:
+Devolve APENAS este JSON sem markdown nem texto adicional:
 {
   "partI": [
     {
-      "id": "q1_mc",
+      "id": "q1",
       "question": "texto da pergunta",
-      "options": {
-        "A": "opção A",
-        "B": "opção B",
-        "C": "opção C",
-        "D": "opção D"
-      },
+      "options": { "A": "opção A", "B": "opção B", "C": "opção C", "D": "opção D" },
       "correctAnswer": "A",
-      "explanation": "explicação detalhada de porquê A é a resposta correta e porquê as outras estão erradas"
+      "explanation": "explicação detalhada"
     }
   ],
   "partII": [
     {
-      "id": "q1_dev",
-      "question": "enunciado completo da pergunta de desenvolvimento",
-      "modelAnswer": "resposta modelo completa e detalhada",
-      "keyPoints": ["ponto chave 1", "ponto chave 2", "ponto chave 3"],
+      "id": "q1",
+      "question": "enunciado",
+      "modelAnswer": "resposta modelo completa",
+      "keyPoints": ["ponto 1", "ponto 2"],
       "maxScore": 5
     }
   ],
   "partIII": [
     {
-      "id": "q1_code",
-      "question": "enunciado completo do problema de código",
+      "id": "q1",
+      "question": "enunciado do problema",
       "language": "Java",
-      "starterCode": "// código inicial se aplicável",
-      "modelAnswer": "código solução completo",
-      "explanation": "explicação do que o código faz e conceitos envolvidos",
+      "starterCode": "// escreve aqui",
+      "modelAnswer": "código solução",
+      "explanation": "explicação",
       "maxScore": 5
     }
   ]
-}
+}`;
 
-Devolve APENAS o JSON, sem texto adicional, sem blocos de markdown.`;
-
-  if (onLoadingStatus) onLoadingStatus('A criar perguntas variadas...');
+  console.log('generateQuestions: enviando chamada para a API do Gemini...', { disciplina, numMultipla, numDesenvolvimento, numCodigo });
 
   try {
     const result = await model.generateContent([
-      pdfPart,
-      { text: mainPrompt }
+      {
+        inlineData: {
+          mimeType: "application/pdf",
+          data: pureBase64
+        }
+      },
+      { text: prompt }
     ]);
 
-    if (onLoadingStatus) onLoadingStatus('A validar estrutura e formato...');
+    console.log('generateQuestions: resposta da chamada recebida do Gemini.');
     const response = await result.response;
-    const textOutput = response.text() || '';
-    const cleanJson = extractJson(textOutput);
-    return JSON.parse(cleanJson) as TestQuestions;
+    const text = response.text() || '';
+
+    // Limpar possível markdown antes de fazer parse
+    const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    return JSON.parse(cleaned) as TestQuestions;
   } catch (error: any) {
-    console.error('generateQuestions initial failed, retrying once as required:', error);
-    try {
-      // Retry once to fulfill 'JSON inválido da IA: tentar novamente automaticamente 1 vez antes de mostrar erro'
-      if (onLoadingStatus) onLoadingStatus('A corrigir formato do exame...');
-      const resultRetry = await model.generateContent([
-        pdfPart,
-        { text: mainPrompt + '\n\nATENÇÃO: Devolve estritamente o objeto JSON descodificável!' }
-      ]);
-      const responseRetry = await resultRetry.response;
-      const cleanJsonRetry = extractJson(responseRetry.text() || '');
-      return JSON.parse(cleanJsonRetry) as TestQuestions;
-    } catch (retryError) {
-      console.error('generateQuestions retry also failed:', retryError);
-      throw error; // Throw original error
-    }
+    console.error("Erro Gemini generateQuestions:", error);
+    throw new Error(`Erro ao gerar perguntas: ${error.message || error}`);
   }
 }
 
@@ -243,86 +178,65 @@ export async function gradeAnswers(
 ): Promise<AICorrectionResult> {
   if (onLoadingStatus) onLoadingStatus('A enviar respostas para correção...');
 
-  // Format relevant developer evaluation details for both Part II and Part III
-  const formattedAnswers = {
-    disciplina,
-    developmentQuestions: questions.partII.map((q) => ({
-      questionId: q.id,
+  const questionsForGrading = [
+    ...questions.partII.map(q => ({
+      id: q.id,
+      type: 'development',
       question: q.question,
       modelAnswer: q.modelAnswer,
       keyPoints: q.keyPoints,
-      studentAnswer: userAnswers.partII[q.id] || 'Sem resposta.'
+      userAnswer: userAnswers.partII[q.id] || ''
     })),
-    codeQuestions: questions.partIII.map((q) => ({
-      questionId: q.id,
+    ...questions.partIII.map(q => ({
+      id: q.id,
+      type: 'code',
       question: q.question,
       language: q.language,
       modelAnswer: q.modelAnswer,
-      studentAnswer: userAnswers.partIII[q.id] || 'Sem resposta.'
-    })),
-  };
+      userAnswer: userAnswers.partIII[q.id] || ''
+    }))
+  ];
 
-  const mainPrompt = `És um professor universitário a corrigir um teste de [${disciplina}].
+  const prompt = `És um professor universitário a corrigir um teste de ${disciplina}.
 
-Avalia as seguintes respostas de desenvolvimento e programação do aluno de Engenharia Informática e devolve um JSON com a correção detalhada.
+Avalia estas respostas do aluno (avaliação SEMÂNTICA, não literal):
 
-REGRAS DE AVALIAÇÃO:
-- Perguntas de desenvolvimento (Part II): 0 a 5 pontos (avalia a corretude semântica, não palavras exatas)
-- Perguntas de código (Part III): 0 a 5 pontos (avalia se a lógica está correta, mesmo com sintaxe diferente, comentários ou formatações separadas)
-- Para desenvolvimento e código: aceitar respostas corretas mesmo com formulação diferente do modelo.
+${JSON.stringify(questionsForGrading, null, 2)}
 
-Dados a corrigir:
-${JSON.stringify(formattedAnswers, null, 2)}
-
-Devolve JSON com esta estrutura exata:
+Devolve APENAS este JSON sem markdown:
 {
   "developmentGrades": [
     {
-      "questionId": "q1_dev",
+      "questionId": "q1",
       "score": 4,
-      "feedback": "feedback detalhado em português de Portugal sobre o que estava bem e o que faltou na resposta do aluno",
-      "strengths": ["ponto positivo da resposta"],
-      "improvements": ["o que podia melhorar"]
+      "feedback": "feedback detalhado",
+      "strengths": ["ponto positivo"],
+      "improvements": ["o que melhorar"]
     }
   ],
   "codeGrades": [
     {
-      "questionId": "q1_code",
+      "questionId": "q1",
       "score": 3,
-      "feedback": "avaliação detalhada se a lógica está correta, correções ou bugs sugeridos",
+      "feedback": "feedback do código",
       "isLogicCorrect": true,
-      "issues": ["problema encontrado se existir, ou vazio se correto"]
+      "issues": ["problema se existir"]
     }
   ]
-}
+}`;
 
-Devolve APENAS o JSON, sem texto adicional, de forma limpa.`;
-
-  if (onLoadingStatus) onLoadingStatus('A avaliar respostas semanticamente...');
+  console.log('gradeAnswers: enviando chamada para a API do Gemini...', { disciplina });
 
   try {
-    const result = await model.generateContent([
-      { text: mainPrompt }
-    ]);
-
-    if (onLoadingStatus) onLoadingStatus('A compilar notas finais...');
+    const result = await model.generateContent(prompt);
+    console.log('gradeAnswers: resposta da chamada recebida do Gemini.');
     const response = await result.response;
-    const textOutput = response.text() || '';
-    const cleanJson = extractJson(textOutput);
-    return JSON.parse(cleanJson) as AICorrectionResult;
+    const text = response.text() || '';
+
+    const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    return JSON.parse(cleaned) as AICorrectionResult;
   } catch (error: any) {
-    console.error('gradeAnswers initial failed, retrying once:', error);
-    try {
-      if (onLoadingStatus) onLoadingStatus('A recalcular notas...');
-      const resultRetry = await model.generateContent([
-        { text: mainPrompt + '\n\nATENÇÃO: Retorna estritamente o JSON válido!' }
-      ]);
-      const responseRetry = await resultRetry.response;
-      const cleanJsonRetry = extractJson(responseRetry.text() || '');
-      return JSON.parse(cleanJsonRetry) as AICorrectionResult;
-    } catch (retryError) {
-      console.error('gradeAnswers retry also failed:', retryError);
-      throw error;
-    }
+    console.error("Erro Gemini gradeAnswers:", error);
+    throw new Error(`Erro ao avaliar respostas: ${error.message || error}`);
   }
 }

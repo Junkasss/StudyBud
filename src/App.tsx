@@ -35,6 +35,7 @@ export default function App() {
   // Active uploads
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedFileBase64, setSelectedFileBase64] = useState<string>('');
+  const [apiError, setApiError] = useState<string | null>(null);
 
   // Universal loading
   const [isLoading, setIsLoading] = useState(false);
@@ -163,11 +164,16 @@ export default function App() {
 
   // 1. GENERATE SUMMARY ACTION
   const handleGenerateSummary = async (disciplineName: string, tipsPrompt: string) => {
-    if (!selectedFileBase64) return;
+    if (!selectedFileBase64 || selectedFileBase64.trim().length === 0) {
+      setApiError('Ficheiro PDF em falta ou vazio. Por favor, carrega um ficheiro PDF válido antes de avançar.');
+      return;
+    }
 
     setIsLoading(true);
     setLoadingStatus('Inicializando conexões ao Gemini...');
+    setApiError(null);
 
+    console.log('handleGenerateSummary: Iniciando geração de resumo com Gemini...');
     try {
       const generatedMarkdown = await generateSummary(
         selectedFileBase64,
@@ -176,6 +182,7 @@ export default function App() {
         (progressText) => setLoadingStatus(progressText)
       );
 
+      console.log('handleGenerateSummary: Resumo gerado com sucesso.');
       const newSummaryRecord: SavedSummary = {
         id: Date.now(),
         discipline: disciplineName,
@@ -195,11 +202,15 @@ export default function App() {
       setIsLoading(false);
       console.error(err);
       
-      // Error routing according to specifications
-      if (err?.status === 429 || err?.message?.includes('429')) {
-        alert('Quota diária da API atingida. Tenta novamente amanhã.');
+      const errMsg = err?.message || '';
+      if (err?.status === 429 || errMsg.includes('429')) {
+        setApiError('A quota diária da API de teste foi atingida (Erro 429 - Quota Exceeded). Por favor tente novamente amanhã.');
+      } else if (errMsg.includes('API_KEY_INVALID') || errMsg.includes('API key not valid') || errMsg.includes('403')) {
+        setApiError('A chave API fornecida não é válida (Erro 403 - Forbidden). Por favor verifique a configuração do seu token.');
+      } else if (errMsg.includes('404')) {
+        setApiError('O modelo solicitado não foi encontrado (Erro 404 - Not Found). Por favor confirme o nome do modelo.');
       } else {
-        alert('Ocorreu um erro ao comunicar com a IA. Confirma a validade do teu PDF ou tenta novamente.');
+        setApiError(`Ocorreu um erro ao comunicar com a IA. Confirma a validade do teu PDF ou tenta novamente. Detalhe: ${errMsg}`);
       }
     }
   };
@@ -213,11 +224,16 @@ export default function App() {
     numII: number, 
     numIII: number
   ) => {
-    if (!selectedFileBase64) return;
+    if (!selectedFileBase64 || selectedFileBase64.trim().length === 0) {
+      setApiError('Ficheiro PDF em falta ou vazio. Por favor, carrega um ficheiro PDF válido antes de avançar.');
+      return;
+    }
 
     setIsLoading(true);
     setLoadingStatus('Esboçando perguntas universitárias...');
+    setApiError(null);
 
+    console.log('handleGenerateAndStartTest: Iniciando geração de teste com Gemini...');
     try {
       const questionsData = await generateQuestions(
         selectedFileBase64,
@@ -230,6 +246,7 @@ export default function App() {
         (progressText) => setLoadingStatus(progressText)
       );
 
+      console.log('handleGenerateAndStartTest: Teste gerado com sucesso.');
       setActiveTestName(testTitle);
       setActiveTestDiscipline(disciplineName);
       setActiveTestQuestions(questionsData);
@@ -240,10 +257,15 @@ export default function App() {
       setIsLoading(false);
       console.error(err);
       
-      if (err?.status === 429 || err?.message?.includes('429')) {
-        alert('Quota diária da API atingida. Tenta novamente amanhã ou usa uma API key com billing ativado.');
+      const errMsg = err?.message || '';
+      if (err?.status === 429 || errMsg.includes('429')) {
+        setApiError('A quota diária da API de teste foi atingida (Erro 429 - Quota Exceeded). Por favor tente novamente amanhã.');
+      } else if (errMsg.includes('API_KEY_INVALID') || errMsg.includes('API key not valid') || errMsg.includes('403')) {
+        setApiError('A chave API fornecida não é válida (Erro 403 - Forbidden). Por favor verifique a configuração do seu token.');
+      } else if (errMsg.includes('404')) {
+        setApiError('O modelo solicitado não foi encontrado (Erro 404 - Not Found). Por favor confirme o nome do modelo.');
       } else {
-        alert('Erro ao extrair as perguntas dos slides. Confirma a tua API Key ou tenta com uma configuração menor.');
+        setApiError(`Erro ao extrair as perguntas dos slides. Confirma a tua API Key ou tenta com uma configuração menor. Detalhe: ${errMsg}`);
       }
     }
   };
@@ -254,7 +276,9 @@ export default function App() {
 
     setIsLoading(true);
     setLoadingStatus('A enviar respostas para correção...');
+    setApiError(null);
 
+    console.log('handleFinishTakingTest: Iniciando correção de teste de avaliação...');
     try {
       const correctionData = await gradeAnswers(
         activeTestQuestions,
@@ -263,6 +287,7 @@ export default function App() {
         (progressText) => setLoadingStatus(progressText)
       );
 
+      console.log('handleFinishTakingTest: Correção concluída com sucesso.');
       setActiveAnswers(userAnswers);
       setActiveCorrection(correctionData);
       setIsReviewMode(false);
@@ -272,7 +297,17 @@ export default function App() {
     } catch (err: any) {
       setIsLoading(false);
       console.error(err);
-      alert('Não foi possível processar a correção pela IA. Tenta formular as respostas de forma simples ou verifica os limites da tua chave.');
+      
+      const errMsg = err?.message || '';
+      if (err?.status === 429 || errMsg.includes('429')) {
+        setApiError('A quota diária da API de teste foi atingida (Erro 429 - Quota Exceeded). Por favor tente novamente amanhã.');
+      } else if (errMsg.includes('API_KEY_INVALID') || errMsg.includes('API key not valid') || errMsg.includes('403')) {
+        setApiError('A chave API fornecida não é válida (Erro 403 - Forbidden). Por favor verifique a configuração do seu token.');
+      } else if (errMsg.includes('404')) {
+        setApiError('O modelo solicitado não foi encontrado (Erro 404 - Not Found). Por favor confirme o nome do modelo.');
+      } else {
+        setApiError(`Não foi possível processar a correção pela IA. Tenta formular as respostas de forma simples ou verifica os limites da tua chave. Detalhe: ${errMsg}`);
+      }
     }
   };
 
@@ -324,6 +359,26 @@ export default function App() {
         {/* MAIN PANEL CONTENT PORT */}
         <main id="sb-content-pane" className="flex-1 p-4 sm:p-6 md:p-8 max-w-7xl w-full mx-auto">
           
+          {apiError && (
+            <div className="mb-6 p-4 bg-red-900/40 border-l-4 border-red-500 rounded-lg text-slate-100 flex items-start justify-between gap-3 shadow-md animate-fade-in" id="api-error-banner">
+              <div className="flex gap-2">
+                <span className="text-xl">⚠️</span>
+                <div>
+                  <h4 className="font-bold text-red-100 font-display">Erro na Chamada do Gemini API</h4>
+                  <p className="text-sm text-red-200 mt-1 font-sans">{apiError}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setApiError(null)}
+                className="text-red-300 hover:text-white font-bold px-2 py-1 rounded hover:bg-red-800 transition-colors cursor-pointer"
+                title="Fechar"
+                id="btn-close-error"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
           {/* Reroute matching view controllers */}
           {currentView === 'dashboard' && (
             <Dashboard 
