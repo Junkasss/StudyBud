@@ -7,14 +7,14 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { TestQuestions, AICorrectionResult, TestAnswers } from '../types';
 
 // Hardcoded API Key as requested in Alteration 1
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "AIzaSyDlRly44lILQn2aRT1BQaO5fcwnjLZGxho";
+const GEMINI_API_KEY = (import.meta as any).env?.VITE_GEMINI_API_KEY || "AIzaSyDlRly44lILQn2aRT1BQaO5fcwnjLZGxho";
 
 // Model name as specified
 const MODEL_NAME = 'gemini-2.0-flash';
 
 // Global instances
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: MODEL_NAME });
+export const model = genAI.getGenerativeModel({ model: MODEL_NAME });
 
 // Helper to remove data URI headers from base64 strings
 function getPureBase64(base64: string): string {
@@ -39,20 +39,79 @@ export async function generateSummary(
   if (onLoadingStatus) onLoadingStatus('A IA está a ler o teu PDF...');
 
   const prompt = `Analisa este PDF de slides universitários da disciplina de ${disciplina}.
-Gera um resumo de estudo EXTREMAMENTE COMPLETO em português de Portugal (pt-PT).
-${professorTips ? `Atenção especial aos seguintes tópicos: ${professorTips}` : ''}
+
+O teu objetivo é criar um GUIA DE ESTUDO COMPLETO e EXPLICATIVO em português de Portugal (pt-PT).
+NÃO faças apenas uma lista do que está no PDF.
+EXPLICA cada conceito como se fosses um professor a ensinar um aluno do zero.
+Usa exemplos concretos, analogias simples e linguagem clara.
+Usa emojis relevantes para tornar o conteúdo mais agradável e fácil de ler.
+${professorTips ? `Atenção especial aos seguintes tópicos indicados pelo professor: ${professorTips}` : ''}
 
 Estrutura obrigatória em Markdown:
-# Resumo de Estudo — ${disciplina}
-## 1. Resumo Executivo
-## 2. Índice de Tópicos
-## 3. Conteúdo Detalhado por Tópico
-## 4. Tabelas Comparativas
-## 5. Pontos-Chave para Exame
-## 6. Glossário
-## 7. Perguntas de Auto-Avaliação
 
-Baseia-te EXCLUSIVAMENTE no conteúdo do PDF.`;
+# 📚 Guia de Estudo — ${disciplina}
+
+## 🎯 1. Resumo Executivo
+[3-4 parágrafos a explicar os conceitos MAIS IMPORTANTES do PDF de forma clara e acessível. 
+Não listes tópicos — EXPLICA o que o estudante precisa mesmo de saber.]
+
+## 📋 2. Índice de Tópicos
+[Lista numerada de todos os tópicos abordados no PDF]
+
+## 📖 3. Explicação Detalhada por Tópico
+[Para CADA tópico importante do PDF:
+
+### 🔹 3.X Nome do Tópico
+
+**O que é?**
+[Explicação clara do conceito em linguagem simples, como se explicasses a um colega]
+
+**Como funciona?**
+[Explicação do funcionamento com detalhes práticos]
+
+**Exemplo concreto:**
+[Exemplo real e prático que ilustra o conceito]
+
+**Código de exemplo (se aplicável):**
+\`\`\`linguagem
+// código de exemplo comentado linha a linha
+\`\`\`
+
+**⚠️ Atenção / Erro comum:**
+[O erro mais comum que os estudantes cometem neste tópico]
+
+**💡 Dica de memorização:**
+[Uma dica ou analogia para ajudar a memorizar o conceito]
+]
+
+## 🔄 4. Tabelas Comparativas
+[Para cada conjunto de conceitos semelhantes, cria uma tabela Markdown clara e bem organizada com emojis nas colunas]
+
+## 🎯 5. Pontos-Chave para o Exame
+[Lista de 10-15 pontos com emojis, explicando brevemente PORQUÊ cada ponto é importante para o exame]
+
+## 📝 6. Glossário Explicado
+[Para cada termo técnico: **Termo** → Definição simples em 1-2 frases, com analogia se possível]
+
+## 🧠 7. Perguntas de Auto-Avaliação
+[8-10 perguntas variadas (teóricas e práticas) com as respetivas respostas detalhadas logo abaixo de cada pergunta]
+
+## 🗺️ 8. Mapa Mental (em texto)
+[Representação hierárquica dos conceitos principais usando indentação e emojis:
+📌 Conceito Principal
+  ├── 🔹 Sub-conceito 1
+  │     ├── Detalhe A
+  │     └── Detalhe B
+  └── 🔹 Sub-conceito 2
+]
+
+REGRAS OBRIGATÓRIAS:
+1. Baseia-te EXCLUSIVAMENTE no conteúdo do PDF fornecido
+2. EXPLICA os conceitos, não te limites a listá-los
+3. Usa emojis relevantes em títulos e pontos importantes
+4. Usa linguagem clara e acessível, sem jargão desnecessário
+5. O resumo deve ser LONGO e DETALHADO — qualidade acima de tudo
+6. Cada explicação deve fazer sentido sozinha, sem precisar do PDF`;
 
   console.log('generateSummary: enviando chamada para a API do Gemini...', { disciplina });
   
@@ -88,13 +147,27 @@ export async function generateQuestions(
   numCodigo: number,
   professorTips?: string,
   nomeTeste?: string,
-  onLoadingStatus?: (status: string) => void
+  onLoadingStatus?: (status: string) => void,
+  previousTestPdfBase64?: string,
+  usePreviousTest?: boolean
 ): Promise<TestQuestions> {
   const pureBase64 = getPureBase64(pdfBase64);
 
   if (onLoadingStatus) onLoadingStatus('A analisar os slides do PDF...');
 
-  const prompt = `Analisa este PDF da disciplina ${disciplina} e gera um teste académico${nomeTeste ? ` intitulado "${nomeTeste}"` : ''}.
+  const previousTestSection = previousTestPdfBase64 && usePreviousTest
+    ? `
+IMPORTANTE — ESTILO DO TESTE ANTERIOR:
+O segundo PDF fornecido é um teste anterior desta disciplina.
+Analisa o seu estilo, estrutura, tipo de perguntas, nível de 
+dificuldade e tópicos abordados.
+As tuas perguntas devem seguir o MESMO ESTILO e ESTRUTURA do 
+teste anterior, mas com conteúdo diferente baseado no PDF da matéria.
+As perguntas NÃO podem ser iguais às do teste anterior, apenas 
+similares em formato e dificuldade.`
+    : '';
+
+  const prompt = `Analisa este PDF da disciplina ${disciplina} e gera um teste académico${nomeTeste ? ` intitulado "${nomeTeste}"` : ''}.${previousTestSection}
 ${professorTips ? `Estilo de perguntas do professor: ${professorTips}` : ''}
 
 Gera EXATAMENTE:
@@ -130,7 +203,7 @@ Devolve APENAS este JSON sem markdown nem texto adicional:
   "partIII": [
     {
       "id": "q1",
-      "question": "enunciado do problema",
+      "question": "enunciado do problem",
       "language": "Java",
       "starterCode": "// escreve aqui",
       "modelAnswer": "código solução",
@@ -143,15 +216,28 @@ Devolve APENAS este JSON sem markdown nem texto adicional:
   console.log('generateQuestions: enviando chamada para a API do Gemini...', { disciplina, numMultipla, numDesenvolvimento, numCodigo });
 
   try {
-    const result = await model.generateContent([
+    const parts: any[] = [
       {
         inlineData: {
           mimeType: "application/pdf",
           data: pureBase64
         }
-      },
-      { text: prompt }
-    ]);
+      }
+    ];
+
+    if (previousTestPdfBase64 && usePreviousTest) {
+      const purePrevBase64 = getPureBase64(previousTestPdfBase64);
+      parts.push({
+        inlineData: {
+          mimeType: "application/pdf",
+          data: purePrevBase64
+        }
+      });
+    }
+
+    parts.push({ text: prompt });
+
+    const result = await model.generateContent(parts);
 
     console.log('generateQuestions: resposta da chamada recebida do Gemini.');
     const response = await result.response;

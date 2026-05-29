@@ -17,6 +17,7 @@ export function Historico({ history, onReviewTest, onClearHistory }: HistoricoPr
   const [filterDiscipline, setFilterDiscipline] = useState<string>('all');
   const [filterGrade, setFilterGrade] = useState<'all' | 'approved' | 'failed'>('all');
   const [sortBy, setSortBy] = useState<'date_desc' | 'date_asc' | 'score_desc' | 'score_asc'>('date_desc');
+  const [showClearConfirm, setShowClearConfirm] = useState<boolean>(false);
 
   // Convert dates
   const formatDate = (isoStr: string) => {
@@ -88,12 +89,8 @@ export function Historico({ history, onReviewTest, onClearHistory }: HistoricoPr
 
         {totalCompleted > 0 && (
           <button
-            onClick={() => {
-              if (confirm('Tens a certeza absoluta que pretendes apagar todo o teu histórico de testes? Esta ação é irreversível.')) {
-                onClearHistory();
-              }
-            }}
-            className="flex-shrink-0 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 font-semibold text-xs rounded-xl border border-red-500/20 transition-all cursor-pointer"
+            onClick={() => setShowClearConfirm(true)}
+            className="flex-shrink-0 px-4 py-2 bg-red-400/10 hover:bg-red-400/20 text-red-400 hover:text-red-300 font-semibold text-xs rounded-xl border border-red-500/25 transition-all cursor-pointer"
           >
             🗑️ Limpar Histórico
           </button>
@@ -236,6 +233,36 @@ export function Historico({ history, onReviewTest, onClearHistory }: HistoricoPr
               ? "Ainda não fizeste nenhum teste de simulação com a IA." 
               : "Nenhum teste coincide com os critérios de filtragem selecionados acima."}
           </p>
+        </div>
+      )}
+
+      {showClearConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-[#12121a] border border-[#2a2a3f] rounded-2xl max-w-sm w-full p-6 shadow-2xl relative select-none">
+            <h3 className="text-lg font-bold text-red-400 mb-2 flex items-center gap-2">
+              <span>⚠️</span> Limpar Todo o Histórico
+            </h3>
+            <p className="text-sm text-[#a09abb] mb-6 leading-relaxed text-left">
+              Tens a certeza absoluta que pretendes apagar todo o teu histórico de testes? Esta ação eliminará permanentemente todos os registos e notas associadas de forma irreversível.
+            </p>
+            <div className="flex items-center justify-end gap-3 font-semibold">
+              <button
+                onClick={() => setShowClearConfirm(false)}
+                className="px-4 py-2 text-xs rounded-lg border border-[#2a2a3f] bg-[#0a0a0f] text-[#a09abb] hover:text-white transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  onClearHistory();
+                  setShowClearConfirm(false);
+                }}
+                className="px-4 py-2 text-xs rounded-lg bg-red-650 hover:bg-red-500 text-white transition-colors cursor-pointer"
+              >
+                Sim, Limpar Tudo
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

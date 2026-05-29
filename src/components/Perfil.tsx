@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { HistoricalTest, SavedSummary } from '../types';
+import { HistoricalTest, SavedSummary, DISCIPLINES } from '../types';
 
 interface PerfilProps {
   history: HistoricalTest[];
@@ -36,6 +36,130 @@ export function Perfil({ history, summaries }: PerfilProps) {
       localStorage.setItem('studybud_username', trimmed);
     }
     setIsEditingName(false);
+  };
+
+  // Load and sanitize profiles as per CORREÇÃO 6
+  const [testProfiles, setTestProfiles] = useState<any>(() => {
+    try {
+      const stored = localStorage.getItem('studybud_test_profiles');
+      const parsed = stored ? JSON.parse(stored) : {};
+      
+      // Ensure every discipline is pre-seeded
+      let updated = false;
+      DISCIPLINES.forEach((disc) => {
+        if (!parsed[disc]) {
+          parsed[disc] = {
+            numTestes: 2,
+            testes: [
+              { numero: 1, nome: "Teste 1", resultados: [] },
+              { numero: 2, nome: "Teste 2", resultados: [] }
+            ]
+          };
+          updated = true;
+        }
+      });
+      if (updated) {
+        localStorage.setItem('studybud_test_profiles', JSON.stringify(parsed));
+      }
+      return parsed;
+    } catch {
+      const defaultProfiles: any = {};
+      DISCIPLINES.forEach((disc) => {
+        defaultProfiles[disc] = {
+          numTestes: 2,
+          testes: [
+            { numero: 1, nome: "Teste 1", resultados: [] },
+            { numero: 2, nome: "Teste 2", resultados: [] }
+          ]
+        };
+      });
+      return defaultProfiles;
+    }
+  });
+
+  const [editingTestKey, setEditingTestKey] = useState<string | null>(null); // e.g., "Computação Móvel-1"
+  const [editingTestValue, setEditingTestValue] = useState<string>("");
+
+  const handleStartEditingTest = (discipline: string, testNum: number, currentName: string) => {
+    setEditingTestKey(`${discipline}-${testNum}`);
+    setEditingTestValue(currentName);
+  };
+
+  const handleSaveTestName = (discipline: string, testNum: number) => {
+    const current = testProfiles[discipline];
+    if (!current) return;
+
+    const updatedTestes = current.testes.map((t: any) => {
+      if (t.numero === testNum) {
+        return { ...t, nome: editingTestValue.trim() || `Teste ${testNum}` };
+      }
+      return t;
+    });
+
+    const updatedProfiles = {
+      ...testProfiles,
+      [discipline]: {
+        ...current,
+        testes: updatedTestes
+      }
+    };
+
+    setTestProfiles(updatedProfiles);
+    localStorage.setItem('studybud_test_profiles', JSON.stringify(updatedProfiles));
+    setEditingTestKey(null);
+  };
+
+  const handleUpdateNumTestes = (discipline: string, num: number) => {
+    const newNum = Math.max(1, Math.min(3, num));
+    const current = testProfiles[discipline] || { numTestes: 2, testes: [] };
+    
+    let updatedTestes = [...current.testes];
+    
+    if (updatedTestes.length < newNum) {
+      // Add more tests
+      for (let i = updatedTestes.length + 1; i <= newNum; i++) {
+        updatedTestes.push({ numero: i, nome: `Teste ${i}`, resultados: [] });
+      }
+    } else if (updatedTestes.length > newNum) {
+      // Truncate tests to the new count
+      updatedTestes = updatedTestes.slice(0, newNum);
+    }
+
+    const updatedProfiles = {
+      ...testProfiles,
+      [discipline]: {
+        numTestes: newNum,
+        testes: updatedTestes
+      }
+    };
+
+    setTestProfiles(updatedProfiles);
+    localStorage.setItem('studybud_test_profiles', JSON.stringify(updatedProfiles));
+  };
+
+  const calcularPreparacao = (resultados: any[]): {
+    nivel: string,
+    percentagem: number,
+    cor: string,
+    emoji: string
+  } => {
+    if (!resultados || resultados.length === 0) return {
+      nivel: 'Sem dados',
+      percentagem: 0,
+      cor: '#4a4a6a',
+      emoji: '❓'
+    };
+    
+    // Média dos últimos 3 resultados (ou todos se menos de 3)
+    const ultimos = resultados.slice(-3);
+    const media = ultimos.reduce((sum, r) => sum + r.score, 0) / ultimos.length;
+    const percentagem = Math.round((media / 20) * 100);
+    
+    if (media >= 17) return { nivel: 'Excelente', percentagem, cor: '#22c55e', emoji: '🚀' };
+    if (media >= 14) return { nivel: 'Bom', percentagem, cor: '#84cc16', emoji: '💪' };
+    if (media >= 10) return { nivel: 'Suficiente', percentagem, cor: '#f59e0b', emoji: '📈' };
+    if (media >= 7)  return { nivel: 'A melhorar', percentagem, cor: '#f97316', emoji: '⚠️' };
+    return { nivel: 'Fraco', percentagem, cor: '#ef4444', emoji: '🔴' };
   };
 
   // 1. Calculate Initials
@@ -576,6 +700,141 @@ export function Perfil({ history, summaries }: PerfilProps) {
           </div>
         </div>
 
+      </div>
+
+      {/* 🎯 PREPARAÇÃO PARA OS TESTES (CORREÇÃO 6) */}
+      <div className="bg-[#12121a] border border-[#2a2a3f] p-6 rounded-2xl shadow-[0_4px_24px_rgba(108,99,255,0.08)] space-y-6">
+        <div>
+          <h3 className="text-lg font-bold font-display text-white flex items-center gap-2">
+            <span>🎯</span> Preparação para os Testes
+          </h3>
+          <p className="text-xs text-[#a09abb] mt-1 text-left">
+            Define as tuas metas de avaliação e acompanha a tua prontidão com base nas notas acumuladas nos simuladores de exame.
+          </p>
+        </div>
+
+        <div className="space-y-6 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+          {DISCIPLINES.map((discipline) => {
+            const currentProfile = testProfiles[discipline] || { numTestes: 2, testes: [] };
+            return (
+              <div key={discipline} className="p-4 bg-slate-900/30 rounded-xl border border-slate-800/60 hover:border-[#6c63ff]/20 transition-all space-y-4">
+                {/* Header Row: Name & Config numTestes */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+                  <div className="space-y-0.5 text-left">
+                    <h4 className="font-bold text-white text-sm sm:text-base">{discipline}</h4>
+                    <p className="text-[10px] text-slate-500 font-mono">Disciplinas LEI</p>
+                  </div>
+                  
+                  {/* Selector of number of tests */}
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-[#a09abb] font-medium">Momentos de Avaliação:</span>
+                    <div className="flex items-center bg-[#0a0a0f] border border-[#2a2a3f] p-0.5 rounded-lg font-sans">
+                      {[1, 2, 3].map((n) => (
+                        <button
+                          key={n}
+                          type="button"
+                          onClick={() => handleUpdateNumTestes(discipline, n)}
+                          className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                            currentProfile.numTestes === n
+                              ? 'bg-indigo-600 text-white shadow'
+                              : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                          }`}
+                        >
+                          {n}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Grid of configured tests */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  {currentProfile.testes.map((t: any) => {
+                    const idxKey = `${discipline}-${t.numero}`;
+                    const isEditing = editingTestKey === idxKey;
+                    const results = history.filter(
+                      (h) => h.discipline === discipline && h.numeroTeste === `Teste ${t.numero}`
+                    );
+                    const prep = calcularPreparacao(results);
+                    
+                    return (
+                      <div key={t.numero} className="p-3.5 bg-[#0a0a0f]/60 rounded-xl border border-slate-800/80 space-y-3.5 text-left animate-fade-in">
+                        
+                        {/* Test Title Block (Editable) */}
+                        <div className="flex items-center justify-between gap-2">
+                          {isEditing ? (
+                            <div className="flex items-center gap-1.5 w-full">
+                              <input
+                                type="text"
+                                value={editingTestValue}
+                                onChange={(e) => setEditingTestValue(e.target.value)}
+                                className="px-2 py-0.5 bg-[#12121a] border border-[#6c63ff] rounded font-semibold text-xs text-white focus:outline-none w-full"
+                              />
+                              <button
+                                onClick={() => handleSaveTestName(discipline, t.numero)}
+                                className="p-1 bg-[#6c63ff] hover:bg-[#7c74ff] rounded text-[10px] text-white cursor-pointer font-bold"
+                              >
+                                ✓
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 w-full justify-between">
+                              <span className="font-bold text-xs text-slate-200 truncate pr-1 animate-fade-in" title={t.nome}>
+                                📝 {t.nome}
+                              </span>
+                              <button
+                                onClick={() => handleStartEditingTest(discipline, t.numero, t.nome)}
+                                className="text-slate-500 hover:text-indigo-400 transition-colors cursor-pointer text-xs"
+                              >
+                                ✏️
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Prep Indicator Summary */}
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="text-slate-500 font-sans">Preparação:</span>
+                            <span 
+                              className="font-bold inline-flex items-center gap-1 font-sans"
+                              style={{ color: prep.cor }}
+                            >
+                              <span>{prep.emoji}</span> {prep.nivel}
+                            </span>
+                          </div>
+
+                          {/* Beautiful Progress Bar */}
+                          <div className="relative w-full h-2 bg-[#12121a] rounded-full border border-slate-800 overflow-hidden">
+                            <div 
+                              className="h-full rounded-full transition-all duration-300"
+                              style={{ 
+                                width: `${prep.percentagem}%`,
+                                backgroundColor: prep.cor 
+                              }}
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono">
+                            <span>Prontidão:</span>
+                            <span className="font-bold">{prep.percentagem}%</span>
+                          </div>
+                        </div>
+
+                        {/* Recent History or placeholder */}
+                        <div className="text-[10px] text-slate-500 border-t border-slate-800/50 pt-2 flex justify-between items-center font-sans">
+                          <span>Simuladores:</span>
+                          <span className="font-bold text-slate-400">{results.length} guardados</span>
+                        </div>
+
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* SECÇÃO 4 — DESEMPENHO POR DISCIPLINA */}

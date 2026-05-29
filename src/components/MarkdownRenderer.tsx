@@ -11,25 +11,22 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
     if (!text) return [];
     
     // We want to handle inline code, bold, and italic in sequence
-    // A simple way is to tokenize with regex and map to elements
     const tokens: React.ReactNode[] = [];
     let currentText = text;
     let keyIndex = 0;
 
-    // We tokenize using recursive split or standard regex matching
-    // Let's matching code blocks first, then bold, then italic
     const regex = /(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)/g;
     const parts = currentText.split(regex);
 
     return parts.map((part, index) => {
       if (part.startsWith('`') && part.endsWith('`')) {
         return (
-          <code key={index} className="px-1.5 py-0.5 bg-slate-800 text-teal-400 font-mono text-sm rounded border border-slate-700">
+          <code key={index} className="px-[6px] py-[2px] bg-[#1a1a27] text-[#22c55e] font-mono text-xs rounded-[4px] border border-[#2a2a3f]">
             {part.slice(1, -1)}
           </code>
         );
       } else if (part.startsWith('**') && part.endsWith('**')) {
-        return <strong key={index} className="font-semibold text-white">{part.slice(2, -2)}</strong>;
+        return <strong key={index} className="font-bold text-[#f1f0ff]">{part.slice(2, -2)}</strong>;
       } else if (part.startsWith('*') && part.endsWith('*')) {
         return <em key={index} className="italic text-slate-300">{part.slice(1, -1)}</em>;
       } else {
@@ -51,12 +48,12 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
 
     const flushCodeBlock = (key: number) => {
       elements.push(
-        <div key={`code-${key}`} className="my-5 overflow-hidden rounded-lg border border-slate-800 bg-slate-950 font-mono text-sm leading-relaxed text-slate-200">
-          <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900 px-4 py-1.5 text-xs text-slate-400 select-none">
+        <div key={`code-${key}`} className="my-5 overflow-hidden rounded-lg border border-[#2a2a3f]">
+          <div className="flex items-center justify-between border-b border-[#2a2a3f] bg-[#1a1a27] px-4 py-1.5 text-xs text-[#a09abb] select-none">
             <span>{codeLang || 'Código'}</span>
-            <span className="text-[10px] uppercase font-semibold text-indigo-400">LEI Terminal</span>
+            <span className="text-[10px] uppercase font-semibold text-[#6c63ff]">StudyBud Terminal</span>
           </div>
-          <pre className="overflow-x-auto p-4"><code className="block">{codeBlockLines.join('\n')}</code></pre>
+          <pre className="overflow-x-auto p-4 bg-[#0d1117] text-[#e6edf3] font-mono text-sm rounded-b-lg border-t border-[#2a2a3f]/50"><code className="block whitespace-pre">{codeBlockLines.join('\n')}</code></pre>
         </div>
       );
       codeBlockLines = [];
@@ -64,21 +61,18 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
     };
 
     const flushTable = (key: number) => {
-      // Find headers and rows
       if (tableLines.length === 0) return;
       
       const rows = tableLines.map(line => 
         line.split('|')
             .map(cell => cell.trim())
             .filter((cell, idx, arr) => {
-              // Ignore initial empty cell if line started with '|'
               if (idx === 0 && cell === '' && arr.length > 2) return false;
               if (idx === arr.length - 1 && cell === '' && arr.length > 2) return false;
               return true;
             })
       );
 
-      // Check for alignment indicator row (e.g. |---|---|)
       const validRows = rows.filter(r => !r.every(c => c.match(/^:?-+:?$/)));
       if (validRows.length === 0) return;
 
@@ -86,22 +80,22 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
       const dataRows = validRows.slice(1);
 
       elements.push(
-        <div key={`table-${key}`} className="my-5 overflow-x-auto rounded-lg border border-slate-800">
+        <div key={`table-${key}`} className="my-5 overflow-x-auto rounded-lg border border-[#2a2a3f]">
           <table className="w-full text-left border-collapse text-sm">
             <thead>
-              <tr className="bg-slate-900 text-slate-200 border-b border-slate-800">
+              <tr className="bg-[#1a1a27] text-[#6c63ff] border-b border-[#2a2a3f]">
                 {headers.map((h, i) => (
-                  <th key={i} className="px-4 py-3 font-semibold text-slate-100 uppercase tracking-wider text-xs">
+                  <th key={i} className="px-3 py-2 font-bold uppercase tracking-wider text-xs border-r border-[#2a2a3f] last:border-r-0">
                     {renderInlineText(h)}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60 bg-slate-900/20">
+            <tbody className="divide-y divide-[#2a2a3f] bg-[#12121a]/50">
               {dataRows.map((row, i) => (
-                <tr key={i} className="hover:bg-indigo-950/20 transition-colors">
+                <tr key={i} className="hover:bg-[#1a1a27]/40 transition-colors">
                   {row.map((cell, idx) => (
-                    <td key={idx} className="px-4 py-3 text-slate-300">
+                    <td key={idx} className="px-3 py-2 text-[#a09abb] border-r border-[#2a2a3f] last:border-r-0">
                       {renderInlineText(cell)}
                     </td>
                   ))}
@@ -119,17 +113,17 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
       
       if (type === 'ul') {
         elements.push(
-          <ul key={`ul-${key}`} className="list-disc pl-6 my-4 space-y-2 text-slate-300">
+          <ul key={`ul-${key}`} className="list-disc marker:text-[#6c63ff] pl-6 my-4 space-y-2 text-[#a09abb] leading-[1.8]">
             {listItems.map((item, i) => (
-              <li key={i}>{renderInlineText(item)}</li>
+              <li key={i} className="pl-1">{renderInlineText(item)}</li>
             ))}
           </ul>
         );
       } else {
         elements.push(
-          <ol key={`ol-${key}`} className="list-decimal pl-6 my-4 space-y-2 text-slate-300">
+          <ol key={`ol-${key}`} className="list-decimal marker:text-[#6c63ff] pl-6 my-4 space-y-2 text-[#a09abb] leading-[1.8]">
             {listItems.map((item, i) => (
-              <li key={i}>{renderInlineText(item)}</li>
+              <li key={i} className="pl-1">{renderInlineText(item)}</li>
             ))}
           </ol>
         );
@@ -147,7 +141,6 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
           flushCodeBlock(i);
           state = 'normal';
         } else {
-          // Finish any list/table
           if (state === 'ul') flushList(i, 'ul');
           if (state === 'ol') flushList(i, 'ol');
           if (state === 'table') flushTable(i);
@@ -182,7 +175,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
         if (state === 'ul') flushList(i, 'ul');
         if (state === 'ol') flushList(i, 'ol');
         elements.push(
-          <h1 key={i} className="text-2xl sm:text-3xl font-bold font-display text-white mt-8 mb-4 border-b border-slate-800 pb-2 flex items-center gap-2">
+          <h1 key={i} className="text-2xl sm:text-3xl font-black font-display text-[#6c63ff] mt-10 mb-6 border-b-2 border-[#6c63ff]/30 pb-3 flex items-center gap-2">
             {renderInlineText(trimmed.substring(2))}
           </h1>
         );
@@ -193,7 +186,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
         if (state === 'ul') flushList(i, 'ul');
         if (state === 'ol') flushList(i, 'ol');
         elements.push(
-          <h2 key={i} className="text-xl sm:text-2xl font-bold font-display text-indigo-300 mt-6 mb-3 flex items-center gap-2">
+          <h2 key={i} className="text-xl sm:text-2xl font-extrabold font-display text-[#8b85ff] mt-10 mb-4 flex items-center gap-2">
             {renderInlineText(trimmed.substring(3))}
           </h2>
         );
@@ -204,7 +197,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
         if (state === 'ul') flushList(i, 'ul');
         if (state === 'ol') flushList(i, 'ol');
         elements.push(
-          <h3 key={i} className="text-lg sm:text-xl font-bold font-display text-slate-200 mt-5 mb-2">
+          <h3 key={i} className="text-base sm:text-lg font-bold font-display text-slate-300 mt-6 mb-2">
             {renderInlineText(trimmed.substring(4))}
           </h3>
         );
@@ -224,7 +217,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
       // Handle Numbered List Item
       const numberMatch = trimmed.match(/^(\d+)\.\s(.*)/);
       if (numberMatch) {
-        if (state !== 'ol') {
+         if (state !== 'ol') {
           if (state === 'ul') flushList(i, 'ul');
           state = 'ol';
         }
@@ -236,7 +229,6 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
       if (trimmed === '') {
         if (state === 'ul') flushList(i, 'ul');
         if (state === 'ol') flushList(i, 'ol');
-        // Let empty separator row exist but do not render empty paragraph
         continue;
       }
 
@@ -251,7 +243,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
 
       // Regular Paragraph
       elements.push(
-        <p key={i} className="my-3 text-slate-300 leading-relaxed text-sm md:text-base">
+        <p key={i} className="mb-4 text-[#a09abb] leading-[1.8] text-sm md:text-base select-text">
           {renderInlineText(trimmed)}
         </p>
       );
@@ -267,7 +259,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
   };
 
   return (
-    <div className="studybud-markdown text-slate-300 pr-1 select-text">
+    <div className="studybud-markdown text-[#a09abb] pr-1 select-text scroll-smooth space-y-6">
       {parseBlocks()}
     </div>
   );

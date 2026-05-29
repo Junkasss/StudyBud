@@ -3,12 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TestQuestions, TestAnswers, AICorrectionResult, HistoricalTest } from '../types';
 
 interface ResultadosCorrecaoProps {
   testName: string;
   discipline: string;
+  numeroTeste?: string;
   questions: TestQuestions;
   answers: TestAnswers;
   grades: AICorrectionResult;
@@ -20,6 +21,7 @@ interface ResultadosCorrecaoProps {
 export function ResultadosCorrecao({
   testName,
   discipline,
+  numeroTeste,
   questions,
   answers,
   grades,
@@ -28,6 +30,7 @@ export function ResultadosCorrecao({
   isHistoricalReview = false,
 }: ResultadosCorrecaoProps) {
   const [hasSaved, setHasSaved] = useState(isHistoricalReview);
+  const [hasAssociated, setHasAssociated] = useState(false);
 
   // 1. Calculate Part I Score (MCQ)
   let partIAnswersCorrect = 0;
@@ -88,31 +91,15 @@ export function ResultadosCorrecao({
   const badgeInfo = getClassificationBadge(finalScoreScaled);
   const isApproved = finalScoreScaled >= 10;
 
-  const triggerSaveToHistory = () => {
-    if (hasSaved) return;
-    
-    const record: HistoricalTest = {
-      id: Date.now(),
-      name: testName,
-      discipline,
-      date: new Date().toISOString(),
-      score: finalScoreScaled,
-      totalQuestions: partITotal + questions.partII.length + questions.partIII.length,
-      partI: { correct: partIAnswersCorrect, total: partITotal },
-      partII: { score: partIIGradeSum, total: partIITotalMax },
-      partIII: { score: partIIIGradeSum, total: partIIITotalMax },
-      questions,
-      answers,
-      grades
-    };
-
-    onSaveHistory(record);
-    setHasSaved(true);
-    alert('Resultado do teste arquivado com sucesso no teu Histórico local!');
-  };
-
   return (
     <div className="space-y-8 pb-20 max-w-4xl mx-auto animate-fade-in select-text">
+      
+      {!isHistoricalReview && (
+        <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-xs sm:text-sm text-left flex items-center gap-2.5 shadow-xs animate-fade-in">
+          <span className="text-emerald-400 font-bold text-xl leading-none">✓</span>
+          <span>Estudo concluído! Este teste de <strong>{discipline}</strong> foi guardado automaticamente no teu <strong>Histórico</strong> e associado ao <strong>{numeroTeste}</strong> no teu Perfil de Avaliação para cálculo imediato da média!</span>
+        </div>
+      )}
       
       {/* 1. SCORE SUMMARY PANEL HEADER */}
       <div className="bg-[#12121a] border border-[#2a2a3f] p-6 rounded-2xl shadow-[0_4px_24px_rgba(108,99,255,0.08)] flex flex-col md:flex-row items-center justify-between gap-6 transition-colors">
@@ -177,24 +164,11 @@ export function ResultadosCorrecao({
 
       {/* CORE CONTROL ROW */}
       <div className="flex items-center gap-4 justify-end flex-wrap">
-        {!isHistoricalReview && (
-          <button
-            onClick={triggerSaveToHistory}
-            disabled={hasSaved}
-            className={`px-5 py-2.5 font-bold text-sm rounded-xl transition-all flex items-center gap-2 cursor-pointer ${
-              hasSaved
-                ? 'bg-slate-800 text-slate-400 border sb-border cursor-not-allowed'
-                : 'bg-indigo-650 bg-indigo-600 hover:bg-indigo-500 text-white shadow-md'
-            }`}
-          >
-            {hasSaved ? '✓ Guardado no Histórico' : '💾 Guardar no Histórico'}
-          </button>
-        )}
         <button
           onClick={onRestart}
-          className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 border sb-border text-slate-200 hover:text-white font-bold text-xs sm:text-sm rounded-xl transition-colors cursor-pointer"
+          className="px-5 py-2.5 bg-[#6c63ff] hover:bg-[#7c74ff] text-white font-bold text-xs sm:text-sm rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-2"
         >
-          🔄 Novo Teste / Voltar
+          📈 Ver Meu Histórico Académico
         </button>
       </div>
 
