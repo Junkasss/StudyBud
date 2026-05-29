@@ -407,9 +407,23 @@ export function ResultadosCorrecao({
 
                       {feedback.issues && feedback.issues.length > 0 && (
                         <div className="p-4 bg-red-500/5 border border-red-500/10 rounded-xl space-y-1.5">
-                          <h6 className="text-[11px] font-bold text-red-400 uppercase tracking-wider">⚠️ Problemas / Bugs Identificados</h6>
-                          <ul className="list-disc pl-4 space-y-1 text-xs text-slate-300">
-                            {feedback.issues.map((issue, i) => <li key={i}>{issue}</li>)}
+                          <h6 className="text-[11px] font-bold text-red-400 uppercase tracking-wider select-none">⚠️ Problemas / Bugs Identificados</h6>
+                          <ul className="list-disc pl-4 space-y-2 text-xs text-slate-300 text-left">
+                            {feedback.issues.map((issue: any, i) => {
+                              if (issue && typeof issue === 'object') {
+                                return (
+                                  <li key={i} className="leading-relaxed">
+                                    {issue.line !== undefined && issue.line !== null && (
+                                      <span className="font-mono text-red-400 font-bold mr-1.5 bg-red-500/10 px-1.5 py-0.5 rounded border border-red-500/20 text-[10px]">
+                                        Linha {issue.line}
+                                      </span>
+                                    )}
+                                    <span>{issue.message || JSON.stringify(issue)}</span>
+                                  </li>
+                                );
+                              }
+                              return <li key={i} className="leading-relaxed">{issue}</li>;
+                            })}
                           </ul>
                         </div>
                       )}
